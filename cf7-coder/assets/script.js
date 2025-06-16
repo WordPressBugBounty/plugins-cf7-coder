@@ -1,87 +1,105 @@
 'use strict';
-(function($) {
-  $(function() {
+(function ($) {
+  $(function () {
+    const checkboxSelector = '#wpcf7_codemiror_dark';
+    const textareaId = 'wpcf7-form';
+    const $textarea = $('#' + textareaId);
     const editorSettings = wp.codeEditor.defaultSettings ? _.clone(wp.codeEditor.defaultSettings) : {};
-    const codemirror_gen =
-        {
-          'indentUnit': 4,
-          'indentWithTabs': true,
-          'inputStyle': 'contenteditable',
-          'lineNumbers': true,
-          'lineWrapping': true,
-          'styleActiveLine': true,
-          'continueComments': true,
-          'extraKeys': {
-            'Ctrl-Space': 'autocomplete',
-            'Ctrl-\/': 'toggleComment',
-            'Cmd-\/': 'toggleComment',
-            'Alt-F': 'findPersistent',
-            'Ctrl-F': 'findPersistent',
-            'Cmd-F': 'findPersistent',
-          },
-          'direction': 'ltr',
-          'gutters': ['CodeMirror-lint-markers'],
-          'mode': 'css',
-          'lint': true,
-          'autoCloseBrackets': true,
-          'autoCloseTags': true,
-          'matchTags': {
-            'bothTags': true,
-          },
-          'tabSize': 2,
-        };
 
-    if ($('#wpcf7-form').length) {
-      let codemirror_el =
-          {
-            'tagname-lowercase': true,
-            'attr-lowercase': true,
-            'attr-value-double-quotes': false,
-            'doctype-first': false,
-            'tag-pair': true,
-            'spec-char-escape': true,
-            'id-unique': true,
-            'src-not-empty': true,
-            'attr-no-duplication': true,
-            'alt-require': true,
-            'space-tab-mixed-disabled': 'tab',
-            'attr-unsafe-chars': true,
-            'mode': 'htmlmixed',
-          };
-
-      editorSettings.codemirror = Object.assign(editorSettings.codemirror, codemirror_gen, codemirror_el);
-
-      var editorHTML = wp.codeEditor.initialize('wpcf7-form', editorSettings);
-    }
-
-
-    var $wpcf7_taggen_insert = wpcf7.taggen.insert;
-    wpcf7.taggen.insert = function(content) {
-      insertTextAtCursor(content);
-      $('#wpcf7-form').text(get_codemirror());
-      $wpcf7_taggen_insert.apply(this, arguments);
+    const codemirrorGen = {
+      indentUnit: 4,
+      indentWithTabs: true,
+      inputStyle: 'contenteditable',
+      lineNumbers: true,
+      lineWrapping: true,
+      matchBrackets: true,
+      styleActiveLine: true,
+      continueComments: true,
+      extraKeys: {
+        'Ctrl-Space': 'autocomplete',
+        'Ctrl-/': 'toggleComment',
+        'Cmd-/': 'toggleComment',
+        'Alt-F': 'findPersistent',
+        'Ctrl-F': 'findPersistent',
+        'Cmd-F': 'findPersistent',
+        'Ctrl-D': function (cm) {
+          cm.execCommand('duplicateLine');
+        },
+        'Cmd-D': function (cm) {
+          cm.execCommand('duplicateLine');
+        },
+      },
+      direction: 'ltr',
+      gutters: ['CodeMirror-lint-markers', 'CodeMirror-linenumbers'],
+      mode: 'htmlmixed',
+      lint: true,
+      autoCloseBrackets: true,
+      autoCloseTags: true,
+      matchTags: { bothTags: true },
+      tabSize: 2,
     };
 
-    function get_codemirror() {
-      return editorHTML.codemirror.getValue();
+    let editorHTML = null;
+
+    // Функція ініціалізації CodeMirror з підтримкою теми
+    function initEditor(isDark) {
+      const finalSettings = Object.assign({}, editorSettings, {
+        codemirror: Object.assign({}, editorSettings.codemirror || {}, codemirrorGen, {
+          theme: isDark ? 'material' : 'default',
+        }),
+      });
+
+      return wp.codeEditor.initialize(textareaId, finalSettings);
     }
 
-    function insertTextAtCursor(text) {
-      var cursor = editorHTML.codemirror.getCursor();
-      editorHTML.codemirror.replaceRange(text, cursor);
+    // Ініціалізуємо редактор, якщо textarea існує
+    if ($textarea.length) {
+      const isDark = $(checkboxSelector).is(':checked');
+      editorHTML = initEditor(isDark);
+
+      editorHTML.codemirror.on('change', function () {
+        document.getElementById(textareaId).value = editorHTML.codemirror.getValue();
+      });
+
+      $('#informationdiv_coder').insertAfter('#informationdiv').show();
+
+      // Зміна теми при кліку на чекбокс
+      $(checkboxSelector).on('change', function () {
+        const newIsDark = $(this).is(':checked');
+        const currentValue = editorHTML.codemirror.getValue();
+
+        editorHTML.codemirror.toTextArea();
+        editorHTML = initEditor(newIsDark);
+        editorHTML.codemirror.setValue(currentValue);
+
+        editorHTML.codemirror.on('change', function () {
+          document.getElementById(textareaId).value = editorHTML.codemirror.getValue();
+        });
+      });
     }
 
-    function sincronized_codemirror() {
-      var text = editorHTML.codemirror.getValue();
-      document.getElementById('wpcf7-form').value = text;
+    // Очікуємо wpcf7.taggen і перевизначаємо insert
+    function waitForWpcf7Taggen(callback, attempt = 0) {
+      if (typeof wpcf7 !== 'undefined' && wpcf7.taggen && typeof wpcf7.taggen.insert === 'function') {
+        callback();
+      } else if (attempt < 20) {
+        setTimeout(() => waitForWpcf7Taggen(callback, attempt + 1), 100);
+      } else {
+        console.warn('wpcf7.taggen.insert не знайдено.');
+      }
     }
 
-    editorHTML.codemirror.on('keyup', function() {
-      sincronized_codemirror();
+    waitForWpcf7Taggen(() => {
+      const originalInsert = wpcf7.taggen.insert;
+
+      wpcf7.taggen.insert = function (content) {
+        if (editorHTML && editorHTML.codemirror) {
+          const cursor = editorHTML.codemirror.getCursor();
+          editorHTML.codemirror.replaceRange(content, cursor);
+          document.getElementById(textareaId).value = editorHTML.codemirror.getValue();
+        }
+        originalInsert.apply(this, arguments);
+      };
     });
-
-    $("#informationdiv_coder").insertAfter("#informationdiv");
-    $("#informationdiv_coder").toggle();
-
   });
 })(jQuery);
