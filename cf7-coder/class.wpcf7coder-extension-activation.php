@@ -90,6 +90,8 @@ class wpcf7_Coder_Extension_Activation {
 			$link = '<a href="' . esc_url( $url ) . '">' . esc_html__( 'install it', 'cf7-coder' ) . '</a>';
 		}
 
-		echo '<div class="error"><p>' . esc_html( $this->plugin_name ) . sprintf( esc_html__( ' requires Contact Form 7! Please %s first and then activate this.', 'cf7-coder' ), $link ) . '</p></div>';
+		/* translators: %s: link to install or activate Contact Form 7 plugin */
+		$message = sprintf( esc_html__( ' requires Contact Form 7! Please %s first and then activate this.', 'cf7-coder' ), $link );
+		echo '<div class="error"><p>' . esc_html( $this->plugin_name ) . wp_kses( $message, array( 'a' => array( 'href' => array() ) ) ) . '</p></div>';
 	}
 }

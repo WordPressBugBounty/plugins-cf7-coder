@@ -76,30 +76,145 @@
           document.getElementById(textareaId).value = editorHTML.codemirror.getValue();
         });
       });
+
+      document.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-taggen="insert-tag"], .insert-tag');
+        if (!btn) {
+          return;
+        }
+
+        const dialog = btn.closest('dialog.tag-generator-dialog');
+        if (!dialog) {
+          return;
+        }
+
+        if (!editorHTML || !editorHTML.codemirror) {
+          return;
+        }
+
+        // Знаходимо значення тега
+        const tagInput = dialog.querySelector('[data-tag-part="tag"], .tag');
+        const tagValue = tagInput?.value;
+
+        if (!tagValue) {
+          return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Вставляємо в CodeMirror
+        const cm = editorHTML.codemirror;
+        const cursor = cm.getCursor();
+        cm.replaceRange(tagValue, cursor);
+        cm.focus();
+        cm.setCursor({ line: cursor.line, ch: cursor.ch + tagValue.length });
+
+        // Синхронізуємо з textarea
+        document.getElementById(textareaId).value = cm.getValue();
+
+        // Закриваємо діалог без значення (щоб CF7 не вставив ще раз)
+        dialog.close('');
+      }, true); // capture phase - важливо для перехоплення до CF7
+
+      // Слухаємо подію close на всіх діалогах (делегування)
+      document.addEventListener('close', function (e) {
+        if (!e.target.matches('dialog.tag-generator-dialog')) {
+          return;
+        }
+
+        if (!editorHTML || !editorHTML.codemirror) {
+          return;
+        }
+
+        // Синхронізуємо CodeMirror з textarea
+        const textareaValue = document.getElementById(textareaId).value;
+        const cmValue = editorHTML.codemirror.getValue();
+        if (textareaValue !== cmValue) {
+          editorHTML.codemirror.setValue(textareaValue);
+        }
+      }, true);
     }
 
-    // Очікуємо wpcf7.taggen і перевизначаємо insert
-    function waitForWpcf7Taggen(callback, attempt = 0) {
-      if (typeof wpcf7 !== 'undefined' && wpcf7.taggen && typeof wpcf7.taggen.insert === 'function') {
-        callback();
-      } else if (attempt < 20) {
-        setTimeout(() => waitForWpcf7Taggen(callback, attempt + 1), 100);
-      } else {
-        console.warn('wpcf7.taggen.insert не знайдено.');
+    function overrideTaggenInsert() {
+      if (typeof wpcf7 === 'undefined' || !wpcf7.taggen) {
+        return;
       }
-    }
 
-    waitForWpcf7Taggen(() => {
       const originalInsert = wpcf7.taggen.insert;
 
-      wpcf7.taggen.insert = function (content) {
+      wpcf7.taggen.insert = function (tag) {
         if (editorHTML && editorHTML.codemirror) {
-          const cursor = editorHTML.codemirror.getCursor();
-          editorHTML.codemirror.replaceRange(content, cursor);
-          document.getElementById(textareaId).value = editorHTML.codemirror.getValue();
+          const cm = editorHTML.codemirror;
+          const cursor = cm.getCursor();
+          cm.replaceRange(tag, cursor);
+          cm.focus();
+          cm.setCursor({ line: cursor.line, ch: cursor.ch + tag.length });
+          document.getElementById(textareaId).value = cm.getValue();
+          return;
         }
         originalInsert.apply(this, arguments);
       };
-    });
+    }
+
+    overrideTaggenInsert();
+    $(document).on('wpcf7Ready', overrideTaggenInsert);
+
+    // Redirect after submit toggle
+    const $redirectCheckbox = $('#wpcf7_redirect_enabled');
+    const $redirectWrap = $('#wpcf7-redirect-url-wrap');
+
+    // Initial state on page load
+    if ($redirectCheckbox.length && $redirectWrap.length) {
+      if (!$redirectCheckbox.is(':checked')) {
+        $redirectWrap.hide();
+      }
+
+      $redirectCheckbox.on('change', function () {
+        if ($(this).is(':checked')) {
+          $redirectWrap.slideDown(200);
+        } else {
+          $redirectWrap.slideUp(200);
+          $('#wpcf7-redirect-url').val('');
+        }
+      });
+    }
+
+    // GA/GTM Event toggle
+    const $gaCheckbox = $('#wpcf7_ga_event');
+    const $gaWrap = $('#wpcf7-ga-event-wrap');
+
+    if ($gaCheckbox.length && $gaWrap.length) {
+      if (!$gaCheckbox.is(':checked')) {
+        $gaWrap.hide();
+      }
+
+      $gaCheckbox.on('change', function () {
+        if ($(this).is(':checked')) {
+          $gaWrap.slideDown(200);
+        } else {
+          $gaWrap.slideUp(200);
+          $('#wpcf7-ga-event-name').val('');
+        }
+      });
+    }
+
+    // Auto-hide message toggle
+    const $autoHideCheckbox = $('#wpcf7_auto_hide_message');
+    const $autoHideWrap = $('#wpcf7-auto-hide-wrap');
+
+    if ($autoHideCheckbox.length && $autoHideWrap.length) {
+      if (!$autoHideCheckbox.is(':checked')) {
+        $autoHideWrap.hide();
+      }
+
+      $autoHideCheckbox.on('change', function () {
+        if ($(this).is(':checked')) {
+          $autoHideWrap.slideDown(200);
+        } else {
+          $autoHideWrap.slideUp(200);
+        }
+      });
+    }
   });
 })(jQuery);

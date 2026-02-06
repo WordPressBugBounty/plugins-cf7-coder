@@ -2,6 +2,7 @@
 	margin-top: 15px;
 	box-shadow: 0 0 0 transparent;
 	resize: vertical;
+	min-height: 800px;
 }
 
 .wpcf7-custom-css {
@@ -45,6 +46,7 @@
 	white-space: break-spaces;
 	line-height: 1.5;
 	text-align: left;
+	z-index: 9;
 }
 .has-tooltip::after {
 	position: absolute;
@@ -59,6 +61,7 @@
 	margin-left: -5px;
 	width: 0;
 	transform: translateX(-50%);
+	z-index: 9;
 }
 .has-tooltip:focus-visible::before, .has-tooltip:focus-visible::after, .has-tooltip:focus::before, .has-tooltip:focus::after, .has-tooltip:hover::before, .has-tooltip:hover::after {
 	opacity: 1;
